@@ -8,6 +8,7 @@ import os
 # Using ORCID is highly recommended for accuracy.
 # Go to https://europepmc.org/advancesearch to build and test your query.
 QUERY = '(AUTHOR_ID:"0000-0003-1289-6919")' # <-- IMPORTANT: REPLACE WITH YOUR QUERY
+# (NAME: "Motro Yair")
 OUTPUT_BIB_FILE = '_bibliography/papers.bib'
 
 # Europe PMC API endpoint
