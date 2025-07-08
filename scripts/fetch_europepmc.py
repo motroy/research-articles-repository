@@ -40,6 +40,15 @@ def format_bibtex(entry):
         bibtex_entry += f"  doi = {{{entry['doi']}}},\n"
     if 'pmid' in entry:
         bibtex_entry += f"  pmid = {{{entry['pmid']}}},\n"
+    if entry.get('citedByCount', 0) > 0: # Add citations if available and greater than 0
+        bibtex_entry += f"  citations = {{{entry['citedByCount']}}},\n"
+    if 'doi' in entry: # Construct URL from DOI
+        bibtex_entry += f"  url = {{https://doi.org/{entry['doi']}}},\n"
+    elif entry.get('fullTextUrlList', {}).get('fullTextUrl'): # Fallback to first full text URL if DOI not present
+        first_url_info = entry['fullTextUrlList']['fullTextUrl'][0]
+        if first_url_info.get('url'):
+            bibtex_entry += f"  url = {{{first_url_info['url']}}},\n"
+
 
     # Close the entry
     bibtex_entry += "}\n"
@@ -65,6 +74,11 @@ def main():
         
         if not publications:
             print("No publications found for the given query.")
+            # Create an empty bib file if no publications are found to prevent errors downstream
+            os.makedirs(os.path.dirname(OUTPUT_BIB_FILE), exist_ok=True)
+            with open(OUTPUT_BIB_FILE, 'w', encoding='utf-8') as f:
+                f.write("") # Write an empty file
+            print(f"Generated an empty {OUTPUT_BIB_FILE} as no publications were found.")
             return
 
         print(f"Found {len(publications)} publications. Generating BibTeX file...")
@@ -74,6 +88,10 @@ def main():
         
         with open(OUTPUT_BIB_FILE, 'w', encoding='utf-8') as f:
             for entry in publications:
+                # Ensure essential data like title and authorString are present
+                if not entry.get('title') or not entry.get('authorString'):
+                    print(f"Skipping entry due to missing title or authors: {entry.get('id', 'Unknown ID')}")
+                    continue
                 bibtex_formatted = format_bibtex(entry)
                 f.write(bibtex_formatted + "\n")
 

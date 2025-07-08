@@ -22,6 +22,12 @@
                 <option value="year_oldest">Year (Oldest First)</option>
                 <option value="author_az">First Author (A-Z)</option>
             </select>
+            <label for="filterStartDate">From Year:</label>
+            <input type="number" id="filterStartDate" placeholder="YYYY" min="1900" max="2100">
+            <label for="filterEndDate">To Year:</label>
+            <input type="number" id="filterEndDate" placeholder="YYYY" min="1900" max="2100">
+            <button id="applyFilterButton">Apply Filters</button>
+            <button id="clearFilterButton">Clear Filters</button>
         </div>
         <div id="publicationsList">
             <!-- Publications will be loaded here by script.js -->
@@ -33,5 +39,12 @@
         <p>Powered by GitHub Pages</p>
     </footer>
 
-    <script src="script.js"></script></body>
+    <div class="chart-container" style="width: 80%; margin: 20px auto;">
+        <h2>Citations per Year</h2>
+        <canvas id="citationsPerYearChart"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
 </html>
