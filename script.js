@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBibButton = document.getElementById('exportBib');
     const exportCsvButton = document.getElementById('exportCsv');
     const exportMdButton = document.getElementById('exportMd');
+    const sortOptionsElement = document.getElementById('sortOptions');
 
     let bibtexData = ''; // To store the raw BibTeX content
     let parsedEntries = []; // To store parsed BibTeX entries
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             parsedEntries = parseBibTeX(bibtexData);
-            displayPublications(parsedEntries);
+            sortAndDisplayPublications(); // Initial sort and display
             disableExportButtons(false);
         } catch (error) {
             console.error('Error loading or parsing BibTeX file:', error);
@@ -75,15 +76,64 @@ document.addEventListener('DOMContentLoaded', () => {
         return entries;
     }
 
+    // --- Sorting Functions ---
+    function getFirstAuthorLastName(entry) {
+        const authorField = entry.fields.author;
+        // Return 'zzzz' (to sort last) if author field is missing, not a string, or empty after trimming
+        if (!authorField || typeof authorField !== 'string' || !authorField.trim()) {
+            return 'zzzz';
+        }
+
+        // Get the string representing the first author.
+        // Given the format in papers.bib (e.g., "Landman D, Cherniak M, ..."),
+        // the first author's full name part is everything before the first comma.
+        let firstAuthorString = authorField.split(',')[0].trim();
+
+        // From this string (e.g., "Landman D" or "Strahilevitz"), the last name is the first word.
+        const nameParts = firstAuthorString.split(' ');
+        let lastName = nameParts[0].trim(); // Takes the first part, e.g. "Landman" from "Landman D"
+
+        // Handle cases where firstAuthorString might be just "Lastname" (no space, so split(' ') gives one part)
+        // or if somehow nameParts[0] was empty or just whitespace.
+        // If lastName is empty at this point but firstAuthorString was not, use firstAuthorString itself.
+        // This covers single-word names like "Plato" correctly if firstAuthorString was "Plato".
+        if (!lastName && firstAuthorString) {
+            lastName = firstAuthorString;
+        }
+        // If after all this, lastName is still undefined or empty (e.g. authorField was just spaces or odd format)
+        // return 'zzzz' to sort it last.
+        return lastName ? lastName.toLowerCase() : 'zzzz';
+    }
+
+    function sortPublications(entries, sortBy) {
+        let sortedEntries = [...entries]; // Create a copy to sort
+        switch (sortBy) {
+            case 'year_newest':
+                sortedEntries.sort((a, b) => (b.fields.year || 0) - (a.fields.year || 0));
+                break;
+            case 'year_oldest':
+                sortedEntries.sort((a, b) => (a.fields.year || Infinity) - (b.fields.year || Infinity));
+                break;
+            case 'author_az':
+                sortedEntries.sort((a, b) => {
+                    const authorA = getFirstAuthorLastName(a);
+                    const authorB = getFirstAuthorLastName(b);
+                    return authorA.localeCompare(authorB);
+                });
+                break;
+        }
+        return sortedEntries;
+    }
+
     // Displays publications on the page
-    function displayPublications(entries) {
-        if (!entries || entries.length === 0) {
+    function displayPublications(entriesToDisplay) {
+        if (!entriesToDisplay || entriesToDisplay.length === 0) {
             publicationsList.innerHTML = '<p>No publications to display.</p>';
             return;
         }
 
         let html = '<ul>';
-        entries.forEach(entry => {
+        entriesToDisplay.forEach(entry => {
             html += '<li>';
             html += `<h3>${entry.fields.title || 'No Title'}</h3>`;
             html += `<p><strong>Authors:</strong> ${entry.fields.author || 'N/A'}</p>`;
@@ -103,6 +153,15 @@ document.addEventListener('DOMContentLoaded', () => {
         html += '</ul>';
         publicationsList.innerHTML = html;
     }
+
+    function sortAndDisplayPublications() {
+        const sortBy = sortOptionsElement.value;
+        const sortedEntries = sortPublications(parsedEntries, sortBy);
+        displayPublications(sortedEntries);
+    }
+
+    // Event listener for sort options
+    sortOptionsElement.addEventListener('change', sortAndDisplayPublications);
 
     // Export functions
     function downloadFile(filename, content, mimeType) {
