@@ -1,0 +1,42 @@
+name: Update Publications from Europe PMC
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  schedule:
+    # Runs every Sunday at 3:15 AM UTC
+    - cron: '15 3 * * 0'
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  update-bibtex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run script to fetch publications
+        run: python scripts/fetch_europepmc.py
+
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add _bibliography/papers.bib
+          # Check if there are any changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to the bibliography file."
+          else
+            git commit -m "Update publications from Europe PMC"
+            git push
+          fi
