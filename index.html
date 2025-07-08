@@ -16,6 +16,12 @@
             <button id="exportBib">Export as .bib</button>
             <button id="exportCsv">Export as .csv</button>
             <button id="exportMd">Export as .md</button>
+            <label for="sortOptions">Sort by:</label>
+            <select id="sortOptions">
+                <option value="year_newest">Year (Newest First)</option>
+                <option value="year_oldest">Year (Oldest First)</option>
+                <option value="author_az">First Author (A-Z)</option>
+            </select>
         </div>
         <div id="publicationsList">
             <!-- Publications will be loaded here by script.js -->
