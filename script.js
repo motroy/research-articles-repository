@@ -345,9 +345,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 },
                 responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Publications per Year' // Added plot title
+                    }
+                }
             }
         });
+
+        // Convert chart to image and update the img tag
+        const chartImage = publicationsChart.toBase64Image();
+        const imgElement = document.getElementById('publicationsPerYearImage');
+        if (imgElement) {
+            imgElement.src = chartImage;
+            // Optionally hide the canvas if the image is displayed separately
+            // ctx.style.display = 'none';
+        } else {
+            console.error('Image element for chart not found!');
+        }
     }
 
     // The plot will be updated using the original full dataset,
