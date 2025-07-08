@@ -195,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortBy = sortOptionsElement.value;
         const sortedAndFilteredEntries = sortPublications(filteredEntries, sortBy);
         displayPublications(sortedAndFilteredEntries);
-        generatePublicationsPerYearPlot(parsedEntries); // Update chart with the original full dataset
+        // generatePublicationsPerYearPlot(parsedEntries); // Removed call to JS plot generation
     }
 
     // Event listeners
@@ -289,86 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Charting Logic ---
-    let publicationsChart = null; // Keep a reference to the chart instance
-
-    function generatePublicationsPerYearPlot(allEntries) { // Renamed and using allEntries
-        const ctx = document.getElementById('citationsPerYearChart');
-        if (!ctx) {
-            console.error('Canvas element for chart not found!');
-            return;
-        }
-
-        const publicationsByYear = {};
-        allEntries.forEach(entry => { // Use allEntries for calculation
-            const year = entry.fields.year;
-            if (year) { // Check if year exists
-                publicationsByYear[year] = (publicationsByYear[year] || 0) + 1; // Increment count for the year
-            }
-        });
-
-        const sortedYears = Object.keys(publicationsByYear).sort((a, b) => parseInt(a) - parseInt(b));
-        const chartData = sortedYears.map(year => publicationsByYear[year]);
-
-        if (publicationsChart) {
-            publicationsChart.destroy(); // Destroy previous chart instance before drawing a new one
-        }
-
-        publicationsChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: sortedYears,
-                datasets: [{
-                    label: 'Number of Publications', // Updated label
-                    data: chartData,
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Number of Publications' // Updated y-axis title
-                        },
-                        ticks: {
-                            stepSize: 1 // Ensure y-axis ticks are integers for publication counts
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Year'
-                        }
-                    }
-                },
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Publications per Year' // Added plot title
-                    }
-                }
-            }
-        });
-
-        // Convert chart to image and update the img tag
-        const chartImage = publicationsChart.toBase64Image();
-        const imgElement = document.getElementById('publicationsPerYearImage');
-        if (imgElement) {
-            imgElement.src = chartImage;
-            // Optionally hide the canvas if the image is displayed separately
-            // ctx.style.display = 'none';
-        } else {
-            console.error('Image element for chart not found!');
-        }
-    }
-
-    // The plot will be updated using the original full dataset,
-    // so it's called from applyFiltersAndSort but with parsedEntries.
+    // The generatePublicationsPerYearPlot function has been removed as plotting is now handled by a Python script.
 
     // Initial load
     loadPublications();
