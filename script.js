@@ -4,6 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvButton = document.getElementById('exportCsv');
     const exportMdButton = document.getElementById('exportMd');
     const sortOptionsElement = document.getElementById('sortOptions');
+    const filterStartDateElement = document.getElementById('filterStartDate');
+    const filterEndDateElement = document.getElementById('filterEndDate');
+    const applyFilterButton = document.getElementById('applyFilterButton');
+    const clearFilterButton = document.getElementById('clearFilterButton');
 
     let bibtexData = ''; // To store the raw BibTeX content
     let parsedEntries = []; // To store parsed BibTeX entries
@@ -22,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             parsedEntries = parseBibTeX(bibtexData);
-            sortAndDisplayPublications(); // Initial sort and display
+            applyFiltersAndSort(); // Initial filter and sort
             disableExportButtons(false);
         } catch (error) {
             console.error('Error loading or parsing BibTeX file:', error);
@@ -147,6 +151,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (entry.fields.howpublished || entry.fields.note) {
                  html += `<p><strong>Note:</strong> ${entry.fields.howpublished || entry.fields.note}</p>`;
             }
+            if (entry.fields.url) {
+                html += `<p><strong>URL:</strong> <a href="${entry.fields.url}" target="_blank">${entry.fields.url}</a></p>`;
+            }
+            if (entry.fields.citations) {
+                html += `<p><strong>Citations:</strong> ${entry.fields.citations}</p>`;
+            }
             html += `<p><em>Type: ${entry.type}, Key: ${entry.key}</em></p>`;
             html += '</li>';
         });
@@ -160,8 +170,43 @@ document.addEventListener('DOMContentLoaded', () => {
         displayPublications(sortedEntries);
     }
 
-    // Event listener for sort options
-    sortOptionsElement.addEventListener('change', sortAndDisplayPublications);
+    // --- Filtering Logic ---
+    function filterPublications(entries) {
+        const startDate = filterStartDateElement.value ? parseInt(filterStartDateElement.value) : null;
+        const endDate = filterEndDateElement.value ? parseInt(filterEndDateElement.value) : null;
+
+        if (!startDate && !endDate) {
+            return entries; // No filter applied
+        }
+
+        return entries.filter(entry => {
+            const year = parseInt(entry.fields.year);
+            if (isNaN(year)) return false; // Skip entries without a valid year
+
+            const meetsStartDate = startDate ? year >= startDate : true;
+            const meetsEndDate = endDate ? year <= endDate : true;
+
+            return meetsStartDate && meetsEndDate;
+        });
+    }
+
+    function applyFiltersAndSort() {
+        const filteredEntries = filterPublications(parsedEntries);
+        const sortBy = sortOptionsElement.value;
+        const sortedAndFilteredEntries = sortPublications(filteredEntries, sortBy);
+        displayPublications(sortedAndFilteredEntries);
+        generateCitationsPlot(sortedAndFilteredEntries); // Update chart with the same data
+    }
+
+    // Event listeners
+    sortOptionsElement.addEventListener('change', applyFiltersAndSort);
+    applyFilterButton.addEventListener('click', applyFiltersAndSort);
+    clearFilterButton.addEventListener('click', () => {
+        filterStartDateElement.value = '';
+        filterEndDateElement.value = '';
+        applyFiltersAndSort(); // Re-apply (which now means no date filter) and sort
+    });
+
 
     // Export functions
     function downloadFile(filename, content, mimeType) {
@@ -242,6 +287,71 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         downloadFile('publications.md', mdContent, 'text/markdown');
     });
+
+    // --- Charting Logic ---
+    let citationsChart = null; // Keep a reference to the chart instance
+
+    function generateCitationsPlot(entries) {
+        const ctx = document.getElementById('citationsPerYearChart');
+        if (!ctx) {
+            console.error('Canvas element for chart not found!');
+            return;
+        }
+
+        const citationsByYear = {};
+        entries.forEach(entry => {
+            const year = entry.fields.year;
+            const citations = parseInt(entry.fields.citations) || 0;
+            if (year && citations > 0) {
+                citationsByYear[year] = (citationsByYear[year] || 0) + citations;
+            }
+        });
+
+        const sortedYears = Object.keys(citationsByYear).sort((a, b) => parseInt(a) - parseInt(b));
+        const chartData = sortedYears.map(year => citationsByYear[year]);
+
+        if (citationsChart) {
+            citationsChart.destroy(); // Destroy previous chart instance before drawing a new one
+        }
+
+        citationsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: sortedYears,
+                datasets: [{
+                    label: 'Total Citations',
+                    data: chartData,
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Citations'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+
+    // Modify displayPublications to also update the chart
+    // We need to call generateCitationsPlot after filtering and sorting
+    // So, it's best to call it from applyFiltersAndSort
+    // This is now done directly in the applyFiltersAndSort function itself.
 
     // Initial load
     loadPublications();
