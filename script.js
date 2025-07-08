@@ -195,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortBy = sortOptionsElement.value;
         const sortedAndFilteredEntries = sortPublications(filteredEntries, sortBy);
         displayPublications(sortedAndFilteredEntries);
-        generateCitationsPlot(sortedAndFilteredEntries); // Update chart with the same data
+        generatePublicationsPerYearPlot(parsedEntries); // Update chart with the original full dataset
     }
 
     // Event listeners
@@ -289,37 +289,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Charting Logic ---
-    let citationsChart = null; // Keep a reference to the chart instance
+    let publicationsChart = null; // Keep a reference to the chart instance
 
-    function generateCitationsPlot(entries) {
+    function generatePublicationsPerYearPlot(allEntries) { // Renamed and using allEntries
         const ctx = document.getElementById('citationsPerYearChart');
         if (!ctx) {
             console.error('Canvas element for chart not found!');
             return;
         }
 
-        const citationsByYear = {};
-        entries.forEach(entry => {
+        const publicationsByYear = {};
+        allEntries.forEach(entry => { // Use allEntries for calculation
             const year = entry.fields.year;
-            const citations = parseInt(entry.fields.citations) || 0;
-            if (year && citations > 0) {
-                citationsByYear[year] = (citationsByYear[year] || 0) + citations;
+            if (year) { // Check if year exists
+                publicationsByYear[year] = (publicationsByYear[year] || 0) + 1; // Increment count for the year
             }
         });
 
-        const sortedYears = Object.keys(citationsByYear).sort((a, b) => parseInt(a) - parseInt(b));
-        const chartData = sortedYears.map(year => citationsByYear[year]);
+        const sortedYears = Object.keys(publicationsByYear).sort((a, b) => parseInt(a) - parseInt(b));
+        const chartData = sortedYears.map(year => publicationsByYear[year]);
 
-        if (citationsChart) {
-            citationsChart.destroy(); // Destroy previous chart instance before drawing a new one
+        if (publicationsChart) {
+            publicationsChart.destroy(); // Destroy previous chart instance before drawing a new one
         }
 
-        citationsChart = new Chart(ctx, {
+        publicationsChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: sortedYears,
                 datasets: [{
-                    label: 'Total Citations',
+                    label: 'Number of Publications', // Updated label
                     data: chartData,
                     backgroundColor: 'rgba(75, 192, 192, 0.2)',
                     borderColor: 'rgba(75, 192, 192, 1)',
@@ -332,7 +331,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Number of Citations'
+                            text: 'Number of Publications' // Updated y-axis title
+                        },
+                        ticks: {
+                            stepSize: 1 // Ensure y-axis ticks are integers for publication counts
                         }
                     },
                     x: {
@@ -348,10 +350,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Modify displayPublications to also update the chart
-    // We need to call generateCitationsPlot after filtering and sorting
-    // So, it's best to call it from applyFiltersAndSort
-    // This is now done directly in the applyFiltersAndSort function itself.
+    // The plot will be updated using the original full dataset,
+    // so it's called from applyFiltersAndSort but with parsedEntries.
 
     // Initial load
     loadPublications();
