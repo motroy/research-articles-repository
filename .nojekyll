@@ -1,0 +1,2 @@
+# This file tells GitHub Pages not to run the site through Jekyll.
+# This ensures that directories like _bibliography are served.
