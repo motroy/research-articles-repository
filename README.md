@@ -1,1 +1,1 @@
-# research-articles-repositry
+# research-articles-repository
