@@ -21,18 +21,20 @@
             <button id="exportBib">Export as .bib</button>
             <button id="exportCsv">Export as .csv</button>
             <button id="exportMd">Export as .md</button>
-            <label for="sortOptions">Sort by:</label>
-            <select id="sortOptions">
-                <option value="year_newest">Year (Newest First)</option>
-                <option value="year_oldest">Year (Oldest First)</option>
-                <option value="author_az">First Author (A-Z)</option>
-            </select>
-            <label for="filterStartDate">From Year:</label>
-            <input type="number" id="filterStartDate" placeholder="YYYY" min="1900" max="2100">
-            <label for="filterEndDate">To Year:</label>
-            <input type="number" id="filterEndDate" placeholder="YYYY" min="1900" max="2100">
-            <button id="applyFilterButton">Apply Filters</button>
-            <button id="clearFilterButton">Clear Filters</button>
+            <br>
+                <label for="sortOptions">Sort by:</label>
+                <select id="sortOptions">
+                    <option value="year_newest">Year (Newest First)</option>
+                    <option value="year_oldest">Year (Oldest First)</option>
+                    <option value="author_az">First Author (A-Z)</option>
+                </select>
+                <label for="filterStartDate">From Year:</label>
+                <input type="number" id="filterStartDate" placeholder="YYYY" min="1900" max="2100">
+                <label for="filterEndDate">To Year:</label>
+                <input type="number" id="filterEndDate" placeholder="YYYY" min="1900" max="2100">
+                <button id="applyFilterButton">Apply Filters</button>
+                <button id="clearFilterButton">Clear Filters</button>
+            </br>
         </div>
         <div id="publicationsList">
             <!-- Publications will be loaded here by script.js -->
