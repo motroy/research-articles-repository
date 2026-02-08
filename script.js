@@ -6,11 +6,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const sortOptionsElement = document.getElementById('sortOptions');
     const filterStartDateElement = document.getElementById('filterStartDate');
     const filterEndDateElement = document.getElementById('filterEndDate');
-    const applyFilterButton = document.getElementById('applyFilterButton');
     const clearFilterButton = document.getElementById('clearFilterButton');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchButton = document.getElementById('clearSearch');
+    const filterJournalElement = document.getElementById('filterJournal');
+    const resultsCountElement = document.getElementById('resultsCount');
 
-    let bibtexData = ''; // To store the raw BibTeX content
-    let parsedEntries = []; // To store parsed BibTeX entries
+    let bibtexData = '';
+    let parsedEntries = [];
+    let searchDebounceTimer = null;
 
     // Fetches and processes the BibTeX file
     async function loadPublications() {
@@ -26,11 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             parsedEntries = parseBibTeX(bibtexData);
-            applyFiltersAndSort(); // Initial filter and sort
+            populateJournalFilter();
+            applyFiltersAndSort();
             disableExportButtons(false);
         } catch (error) {
             console.error('Error loading or parsing BibTeX file:', error);
-            publicationsList.innerHTML = `<p>Error loading publications: ${error.message}. Please check the console for more details.</p>`;
+            publicationsList.innerHTML = `<div class="no-results"><p class="no-results-title">Error loading publications</p><p>${error.message}</p></div>`;
             disableExportButtons(true);
         }
     }
@@ -41,10 +46,27 @@ document.addEventListener('DOMContentLoaded', () => {
         exportMdButton.disabled = disable;
     }
 
+    // Populate journal filter dropdown from data
+    function populateJournalFilter() {
+        const journals = new Set();
+        parsedEntries.forEach(entry => {
+            const journal = entry.fields.journal;
+            if (journal && journal.trim()) {
+                journals.add(journal.trim());
+            }
+        });
+        const sorted = Array.from(journals).sort((a, b) => a.localeCompare(b));
+        sorted.forEach(journal => {
+            const option = document.createElement('option');
+            option.value = journal;
+            option.textContent = journal;
+            filterJournalElement.appendChild(option);
+        });
+    }
+
     // Basic BibTeX Parser
     function parseBibTeX(bibtexString) {
         const entries = [];
-        // Remove comments and split by entry
         const bibEntries = bibtexString.replace(/%.*\n/g, '').split(/@(?=\w+\s*\{)/);
 
         bibEntries.forEach(entryStr => {
@@ -60,8 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const fieldsStr = entryStr.substring(commaAfterKey + 1, entryStr.lastIndexOf('}'));
 
-            // Regex to match field = {value} or field = "value"
-            // This is a simplified parser and might not handle all BibTeX complexities (e.g., nested braces, @string macros)
             const fieldRegex = /\s*(\w+)\s*=\s*[\{{"]?([^}"{]+)[\}}"}]?,?/g;
             let match;
             entry.fields = {};
@@ -69,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
             while ((match = fieldRegex.exec(fieldsStr)) !== null) {
                 const key = match[1].trim().toLowerCase();
                 let value = match[2].trim();
-                // Basic cleanup: remove extra braces if they are the outer layer
                 if (value.startsWith('{') && value.endsWith('}')) {
                     value = value.substring(1, value.length - 1);
                 }
@@ -83,34 +102,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Sorting Functions ---
     function getFirstAuthorLastName(entry) {
         const authorField = entry.fields.author;
-        // Return 'zzzz' (to sort last) if author field is missing, not a string, or empty after trimming
         if (!authorField || typeof authorField !== 'string' || !authorField.trim()) {
             return 'zzzz';
         }
 
-        // Get the string representing the first author.
-        // Given the format in papers.bib (e.g., "Landman D, Cherniak M, ..."),
-        // the first author's full name part is everything before the first comma.
         let firstAuthorString = authorField.split(',')[0].trim();
-
-        // From this string (e.g., "Landman D" or "Strahilevitz"), the last name is the first word.
         const nameParts = firstAuthorString.split(' ');
-        let lastName = nameParts[0].trim(); // Takes the first part, e.g. "Landman" from "Landman D"
+        let lastName = nameParts[0].trim();
 
-        // Handle cases where firstAuthorString might be just "Lastname" (no space, so split(' ') gives one part)
-        // or if somehow nameParts[0] was empty or just whitespace.
-        // If lastName is empty at this point but firstAuthorString was not, use firstAuthorString itself.
-        // This covers single-word names like "Plato" correctly if firstAuthorString was "Plato".
         if (!lastName && firstAuthorString) {
             lastName = firstAuthorString;
         }
-        // If after all this, lastName is still undefined or empty (e.g. authorField was just spaces or odd format)
-        // return 'zzzz' to sort it last.
         return lastName ? lastName.toLowerCase() : 'zzzz';
     }
 
     function sortPublications(entries, sortBy) {
-        let sortedEntries = [...entries]; // Create a copy to sort
+        let sortedEntries = [...entries];
         switch (sortBy) {
             case 'year_newest':
                 sortedEntries.sort((a, b) => (b.fields.year || 0) - (a.fields.year || 0));
@@ -125,88 +132,205 @@ document.addEventListener('DOMContentLoaded', () => {
                     return authorA.localeCompare(authorB);
                 });
                 break;
+            case 'citations_desc':
+                sortedEntries.sort((a, b) => {
+                    const citA = parseInt(a.fields.citations) || 0;
+                    const citB = parseInt(b.fields.citations) || 0;
+                    return citB - citA;
+                });
+                break;
         }
         return sortedEntries;
     }
 
-    // Displays publications on the page
-    function displayPublications(entriesToDisplay) {
-        if (!entriesToDisplay || entriesToDisplay.length === 0) {
-            publicationsList.innerHTML = '<p>No publications to display.</p>';
-            return;
-        }
-
-        let html = '<ul>';
-        entriesToDisplay.forEach(entry => {
-            html += '<li>';
-            html += `<h3>${entry.fields.title || 'No Title'}</h3>`;
-            html += `<p><strong>Authors:</strong> ${entry.fields.author || 'N/A'}</p>`;
-            html += `<p><strong>Year:</strong> ${entry.fields.year || 'N/A'}</p>`;
-            if (entry.fields.journal) {
-                html += `<p><strong>Journal:</strong> ${entry.fields.journal}</p>`;
-            }
-            if (entry.fields.booktitle) {
-                html += `<p><strong>Book Title:</strong> ${entry.fields.booktitle}</p>`;
-            }
-            if (entry.fields.howpublished || entry.fields.note) {
-                 html += `<p><strong>Note:</strong> ${entry.fields.howpublished || entry.fields.note}</p>`;
-            }
-            if (entry.fields.url) {
-                html += `<p><strong>URL:</strong> <a href="${entry.fields.url}" target="_blank">${entry.fields.url}</a></p>`;
-            }
-            if (entry.fields.citations) {
-                html += `<p><strong>Citations:</strong> ${entry.fields.citations}</p>`;
-            }
-            html += `<p><em>Type: ${entry.type}, Key: ${entry.key}</em></p>`;
-            html += '</li>';
-        });
-        html += '</ul>';
-        publicationsList.innerHTML = html;
+    // --- Search Functions ---
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
-    function sortAndDisplayPublications() {
-        const sortBy = sortOptionsElement.value;
-        const sortedEntries = sortPublications(parsedEntries, sortBy);
-        displayPublications(sortedEntries);
+    function highlightText(text, query) {
+        if (!query) return escapeHtml(text);
+        const escaped = escapeHtml(text);
+        const terms = query.trim().split(/\s+/).filter(t => t.length > 0);
+        let result = escaped;
+        terms.forEach(term => {
+            const regex = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+            result = result.replace(regex, '<mark>$1</mark>');
+        });
+        return result;
+    }
+
+    function searchPublications(entries, query) {
+        if (!query || !query.trim()) return entries;
+        const terms = query.toLowerCase().trim().split(/\s+/).filter(t => t.length > 0);
+
+        return entries.filter(entry => {
+            const searchable = [
+                entry.fields.title || '',
+                entry.fields.author || '',
+                entry.fields.journal || '',
+                entry.fields.booktitle || '',
+                entry.fields.doi || '',
+                entry.fields.year || '',
+                entry.key || ''
+            ].join(' ').toLowerCase();
+
+            return terms.every(term => searchable.includes(term));
+        });
     }
 
     // --- Filtering Logic ---
     function filterPublications(entries) {
         const startDate = filterStartDateElement.value ? parseInt(filterStartDateElement.value) : null;
         const endDate = filterEndDateElement.value ? parseInt(filterEndDateElement.value) : null;
+        const selectedJournal = filterJournalElement.value;
 
-        if (!startDate && !endDate) {
-            return entries; // No filter applied
+        let filtered = entries;
+
+        // Year range filter
+        if (startDate || endDate) {
+            filtered = filtered.filter(entry => {
+                const year = parseInt(entry.fields.year);
+                if (isNaN(year)) return false;
+                const meetsStartDate = startDate ? year >= startDate : true;
+                const meetsEndDate = endDate ? year <= endDate : true;
+                return meetsStartDate && meetsEndDate;
+            });
         }
 
-        return entries.filter(entry => {
-            const year = parseInt(entry.fields.year);
-            if (isNaN(year)) return false; // Skip entries without a valid year
+        // Journal filter
+        if (selectedJournal) {
+            filtered = filtered.filter(entry => {
+                return entry.fields.journal && entry.fields.journal.trim() === selectedJournal;
+            });
+        }
 
-            const meetsStartDate = startDate ? year >= startDate : true;
-            const meetsEndDate = endDate ? year <= endDate : true;
-
-            return meetsStartDate && meetsEndDate;
-        });
+        return filtered;
     }
 
     function applyFiltersAndSort() {
-        const filteredEntries = filterPublications(parsedEntries);
+        const query = searchInput.value;
+        let results = filterPublications(parsedEntries);
+        results = searchPublications(results, query);
         const sortBy = sortOptionsElement.value;
-        const sortedAndFilteredEntries = sortPublications(filteredEntries, sortBy);
-        displayPublications(sortedAndFilteredEntries);
-        // generatePublicationsPerYearPlot(parsedEntries); // Removed call to JS plot generation
+        results = sortPublications(results, sortBy);
+        displayPublications(results, query);
+        updateResultsCount(results.length, parsedEntries.length);
     }
 
-    // Event listeners
-    sortOptionsElement.addEventListener('change', applyFiltersAndSort);
-    applyFilterButton.addEventListener('click', applyFiltersAndSort);
-    clearFilterButton.addEventListener('click', () => {
-        filterStartDateElement.value = '';
-        filterEndDateElement.value = '';
-        applyFiltersAndSort(); // Re-apply (which now means no date filter) and sort
+    function updateResultsCount(shown, total) {
+        if (shown === total) {
+            resultsCountElement.textContent = `${total} publication${total !== 1 ? 's' : ''}`;
+        } else {
+            resultsCountElement.textContent = `${shown} of ${total} publication${total !== 1 ? 's' : ''}`;
+        }
+    }
+
+    // Displays publications on the page
+    function displayPublications(entriesToDisplay, searchQuery) {
+        if (!entriesToDisplay || entriesToDisplay.length === 0) {
+            const query = searchQuery || searchInput.value;
+            let msg = '<div class="no-results">';
+            msg += '<p class="no-results-title">No publications found</p>';
+            if (query) {
+                msg += `<p>No results match "${escapeHtml(query)}"</p>`;
+            }
+            msg += '<p>Try adjusting your search or filters.</p>';
+            msg += '</div>';
+            publicationsList.innerHTML = msg;
+            return;
+        }
+
+        const query = searchQuery || '';
+        const externalLinkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+
+        let html = '<ul>';
+        entriesToDisplay.forEach(entry => {
+            html += '<li>';
+
+            // Title - link to URL if available
+            const titleText = entry.fields.title || 'No Title';
+            if (entry.fields.url) {
+                html += `<h3><a href="${escapeHtml(entry.fields.url)}" target="_blank" rel="noopener">${highlightText(titleText, query)}</a></h3>`;
+            } else {
+                html += `<h3>${highlightText(titleText, query)}</h3>`;
+            }
+
+            // Authors
+            if (entry.fields.author) {
+                html += `<p class="pub-authors">${highlightText(entry.fields.author, query)}</p>`;
+            }
+
+            // Metadata tags
+            html += '<div class="pub-meta">';
+            if (entry.fields.year) {
+                html += `<span class="tag tag-year">${escapeHtml(entry.fields.year)}</span>`;
+            }
+            if (entry.fields.journal) {
+                html += `<span class="tag tag-journal">${highlightText(entry.fields.journal, query)}</span>`;
+            } else if (entry.fields.booktitle) {
+                html += `<span class="tag tag-journal">${highlightText(entry.fields.booktitle, query)}</span>`;
+            }
+            if (entry.fields.citations) {
+                const citCount = parseInt(entry.fields.citations);
+                if (citCount > 0) {
+                    html += `<span class="tag tag-citations">${citCount} citation${citCount !== 1 ? 's' : ''}</span>`;
+                }
+            }
+            if (entry.type) {
+                html += `<span class="tag">${escapeHtml(entry.type)}</span>`;
+            }
+            html += '</div>';
+
+            // External link
+            if (entry.fields.url) {
+                html += `<a href="${escapeHtml(entry.fields.url)}" target="_blank" rel="noopener" class="pub-link">${externalLinkIcon} View publication</a>`;
+            }
+
+            html += '</li>';
+        });
+        html += '</ul>';
+        publicationsList.innerHTML = html;
+    }
+
+    // --- Event Listeners ---
+
+    // Real-time search with debounce
+    searchInput.addEventListener('input', () => {
+        clearSearchButton.style.display = searchInput.value ? 'block' : 'none';
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(applyFiltersAndSort, 200);
     });
 
+    clearSearchButton.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchButton.style.display = 'none';
+        applyFiltersAndSort();
+        searchInput.focus();
+    });
+
+    // Sort and filter controls - apply immediately on change
+    sortOptionsElement.addEventListener('change', applyFiltersAndSort);
+    filterJournalElement.addEventListener('change', applyFiltersAndSort);
+    filterStartDateElement.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(applyFiltersAndSort, 400);
+    });
+    filterEndDateElement.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(applyFiltersAndSort, 400);
+    });
+
+    clearFilterButton.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchButton.style.display = 'none';
+        filterStartDateElement.value = '';
+        filterEndDateElement.value = '';
+        filterJournalElement.value = '';
+        applyFiltersAndSort();
+    });
 
     // Export functions
     function downloadFile(filename, content, mimeType) {
@@ -243,9 +367,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const doi = entry.fields.doi || '';
             const url = entry.fields.url || entry.fields.eprint || '';
 
-            // Basic CSV escaping (wrapping in quotes if it contains comma or quote)
             const escapeCsv = (val) => {
-                let str = String(val).replace(/"/g, '""'); // escape double quotes
+                let str = String(val).replace(/"/g, '""');
                 if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                     str = `"${str}"`;
                 }
@@ -279,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (entry.fields.url) {
                 mdContent += `- **URL:** [${entry.fields.url}](${entry.fields.url})\n`;
             }
-             if (entry.fields.eprint) {
+            if (entry.fields.eprint) {
                 mdContent += `- **ePrint:** [${entry.fields.eprint}](${entry.fields.eprint})\n`;
             }
             mdContent += `- *BibTeX Key: ${entry.key} (${entry.type})*\n\n`;
@@ -287,9 +410,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         downloadFile('publications.md', mdContent, 'text/markdown');
     });
-
-    // --- Charting Logic ---
-    // The generatePublicationsPerYearPlot function has been removed as plotting is now handled by a Python script.
 
     // Initial load
     loadPublications();
