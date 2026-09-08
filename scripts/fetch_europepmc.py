@@ -28,8 +28,11 @@ def format_bibtex(entry):
         # Replace '.,' with ' and ' for better formatting
         authors = entry['authorString'].replace('.,', ' and').replace('.', '')
         bibtex_entry += f"  author = {{{authors}}},\n"
-    if 'journalTitle' in entry:
-        bibtex_entry += f"  journal = {{{entry['journalTitle']}}},\n"
+    # Europe PMC returns the journal name under journalInfo.journal.title
+    # (older responses used a flat journalTitle key, so accept both).
+    journal_title = entry.get('journalTitle') or entry.get('journalInfo', {}).get('journal', {}).get('title')
+    if journal_title:
+        bibtex_entry += f"  journal = {{{journal_title}}},\n"
     if 'pubYear' in entry:
         bibtex_entry += f"  year = {{{entry['pubYear']}}},\n"
     if 'journalVolume' in entry:

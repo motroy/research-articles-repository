@@ -3,92 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
+    <meta name="description" content="Searchable, filterable list of research articles and academic publications, updated automatically from Europe PMC.">
+    <meta property="og:title" content="Publications">
+    <meta property="og:description" content="Searchable, filterable list of research articles and academic publications.">
+    <meta property="og:type" content="website">
     <title>Publications</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233b6cf6'/%3E%3Cpath d='M30 26h40v8H30zM30 46h40v8H30zM30 66h26v8H30z' fill='%23fff'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="style.css">
+    <script>
+        // Apply the saved theme before first paint to avoid a flash of the wrong theme.
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+            } catch (e) { /* storage unavailable */ }
+        })();
+    </script>
 </head>
 <body>
-    <header>
-        <div class="header-content">
-            <h1>Publications</h1>
-            <p class="header-subtitle">Research articles and academic publications</p>
+    <a class="skip-link" href="#publicationsList">Skip to publications</a>
+
+    <header class="site-header">
+        <div class="container header-inner">
+            <div class="header-text">
+                <p class="eyebrow">Research output</p>
+                <h1>Publications</h1>
+                <p class="header-subtitle">Peer-reviewed articles, updated automatically from Europe PMC.</p>
+            </div>
+            <button id="themeToggle" class="icon-btn theme-toggle" type="button" aria-label="Switch to dark theme" title="Toggle theme">
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="container">
+            <dl class="stats" id="stats" aria-label="Summary statistics">
+                <div class="stat">
+                    <dt>Publications</dt>
+                    <dd id="statPublications">–</dd>
+                </div>
+                <div class="stat">
+                    <dt>Citations</dt>
+                    <dd id="statCitations">–</dd>
+                </div>
+                <div class="stat">
+                    <dt>h-index</dt>
+                    <dd id="statHIndex">–</dd>
+                </div>
+                <div class="stat">
+                    <dt>Years active</dt>
+                    <dd id="statYears">–</dd>
+                </div>
+            </dl>
         </div>
     </header>
 
-    <main>
-        <div class="search-section">
+    <main class="container">
+        <section class="toolbar" aria-label="Search and filters">
             <div class="search-box">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="8"/>
                     <path d="m21 21-4.35-4.35"/>
                 </svg>
-                <input type="text" id="searchInput" placeholder="Search by title, author, journal, or DOI...">
-                <button id="clearSearch" class="clear-search" title="Clear search" style="display:none;">&times;</button>
+                <label for="searchInput" class="visually-hidden">Search publications</label>
+                <input type="search" id="searchInput" placeholder="Search title, author, journal, DOI…" autocomplete="off" spellcheck="false">
+                <kbd class="search-kbd" aria-hidden="true">/</kbd>
+                <button id="clearSearch" class="clear-search" type="button" aria-label="Clear search" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
             </div>
-        </div>
 
-        <div class="controls-section">
             <div class="filters-row">
                 <div class="filter-group">
                     <label for="sortOptions">Sort by</label>
                     <select id="sortOptions">
-                        <option value="year_newest">Year (Newest)</option>
-                        <option value="year_oldest">Year (Oldest)</option>
-                        <option value="author_az">Author (A-Z)</option>
-                        <option value="citations_desc">Citations (Most)</option>
+                        <option value="year_newest">Newest first</option>
+                        <option value="year_oldest">Oldest first</option>
+                        <option value="citations_desc">Most cited</option>
+                        <option value="author_az">First author (A–Z)</option>
+                        <option value="title_az">Title (A–Z)</option>
                     </select>
                 </div>
 
-                <div class="filter-group">
+                <div class="filter-group" id="journalFilterGroup" hidden>
                     <label for="filterJournal">Journal</label>
                     <select id="filterJournal">
-                        <option value="">All Journals</option>
+                        <option value="">All journals</option>
                     </select>
                 </div>
 
                 <div class="filter-group">
-                    <label for="filterStartDate">From Year</label>
-                    <input type="number" id="filterStartDate" placeholder="e.g. 2020" min="1900" max="2100">
+                    <label for="filterStartDate">From year</label>
+                    <select id="filterStartDate">
+                        <option value="">Any</option>
+                    </select>
                 </div>
 
                 <div class="filter-group">
-                    <label for="filterEndDate">To Year</label>
-                    <input type="number" id="filterEndDate" placeholder="e.g. 2025" min="1900" max="2100">
+                    <label for="filterEndDate">To year</label>
+                    <select id="filterEndDate">
+                        <option value="">Any</option>
+                    </select>
                 </div>
 
                 <div class="filter-group filter-actions">
-                    <button id="clearFilterButton" class="btn btn-secondary">Clear Filters</button>
+                    <button id="clearFilterButton" class="btn btn-secondary" type="button" hidden>Reset</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="chart-card" aria-labelledby="chartTitle">
+            <div class="chart-header">
+                <h2 id="chartTitle">Publications per year</h2>
+                <p class="chart-hint" id="chartHint">Click a bar to filter by year.</p>
+            </div>
+            <div id="yearChart" class="year-chart" role="img" aria-label="Bar chart of publications per year"></div>
+            <noscript>
+                <img src="static/publications_per_year.png" alt="Publications per year chart" class="chart-fallback">
+            </noscript>
+        </section>
+
+        <div class="results-bar">
+            <p id="resultsCount" class="results-count" role="status" aria-live="polite">Loading…</p>
+            <div class="export-menu">
+                <button id="exportToggle" class="btn btn-secondary" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="exportOptions" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    Export
+                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div id="exportOptions" class="export-options" role="menu" hidden>
+                    <button id="exportBib" class="export-option" type="button" role="menuitem">BibTeX <span>.bib</span></button>
+                    <button id="exportCsv" class="export-option" type="button" role="menuitem">Spreadsheet <span>.csv</span></button>
+                    <button id="exportMd" class="export-option" type="button" role="menuitem">Markdown <span>.md</span></button>
+                    <button id="exportJson" class="export-option" type="button" role="menuitem">JSON <span>.json</span></button>
                 </div>
             </div>
         </div>
 
-        <div class="results-bar">
-            <span id="resultsCount">Loading...</span>
-            <div class="export-buttons">
-                <button id="exportBib" class="btn btn-export" disabled>Export .bib</button>
-                <button id="exportCsv" class="btn btn-export" disabled>Export .csv</button>
-                <button id="exportMd" class="btn btn-export" disabled>Export .md</button>
-            </div>
-        </div>
-
-        <div class="chart-container">
-            <details>
-                <summary>Publications per Year</summary>
-                <img src="static/publications_per_year.png" alt="Publications per Year Chart">
-            </details>
-        </div>
-
-        <div id="publicationsList">
-            <div class="loading-spinner">
-                <div class="spinner"></div>
-                <p>Loading publications...</p>
-            </div>
+        <div id="publicationsList" class="publications" aria-busy="true">
+            <ul class="skeleton-list" aria-hidden="true">
+                <li class="skeleton-card"><span class="skeleton-line w-80"></span><span class="skeleton-line w-60"></span><span class="skeleton-line w-40"></span></li>
+                <li class="skeleton-card"><span class="skeleton-line w-70"></span><span class="skeleton-line w-50"></span><span class="skeleton-line w-40"></span></li>
+                <li class="skeleton-card"><span class="skeleton-line w-90"></span><span class="skeleton-line w-60"></span><span class="skeleton-line w-30"></span></li>
+            </ul>
         </div>
     </main>
 
-    <footer>
-        <p>Powered by GitHub Pages</p>
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <p>Data from <a href="https://europepmc.org/" target="_blank" rel="noopener">Europe PMC</a>. Refreshed weekly by GitHub Actions.</p>
+            <p><a href="_bibliography/papers.bib">Raw BibTeX</a> · <a href="https://github.com/motroy/research-articles-repository" target="_blank" rel="noopener">Source on GitHub</a></p>
+        </div>
     </footer>
 
-    <script src="script.js"></script>
+    <button id="backToTop" class="icon-btn back-to-top" type="button" aria-label="Back to top" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script type="module" src="script.js"></script>
 </body>
 </html>
